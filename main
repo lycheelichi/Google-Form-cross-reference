@@ -1,0 +1,557 @@
+
+//----------------------------------------------------------------------------------//
+//-----------------------------------send forms ------------------------------------//
+//----------------------------------------------------------------------------------//
+ 
+function sendForm() {
+ // date information
+ let today = new Date();
+ let currentWeekDay = today.getDay();
+ let currentDate = today.getUTCDate();
+ let currentMonth = today.getMonth() +1;
+ 
+ let thisForm = new GetSheetInfo('Controls','A2:B5');
+ let thisSheetValues = thisForm.sheetValues;
+ 
+ let controlStatus = thisSheetValues[0][1];
+ let emailAddress = thisSheetValues[2][1];
+ let formUrl = thisForm.formUrl;
+ 
+ let seoulTimeZone = today.getUTCHours()+9;
+ 
+ console.log(seoulTimeZone);
+ console.log(emailAddress)
+ 
+ if(currentWeekDay == 6 || currentWeekDay ==0 ){
+   return
+ }
+ 
+ if(controlStatus =="ACTIVATED"){
+   let subject = "Email Subject";
+   let message = "Please click <a href='"+formUrl+"'>survey</a>.<br/><br/> Thank you. ";
+ 
+   let emailObject = {to:emailAddress,subject:subject,htmlBody:message};
+   if(emailAddress){
+     console.log("sending email")
+     MailApp.sendEmail(emailObject);
+     console.log("Email sent ")
+   }
+ }
+}
+ 
+//----------------------------------------------------------------------------------//
+//-------------------------------create new tabs-----------------------------------//
+//----------------------------------------------------------------------------------//
+
+ 
+function createNewTab(){
+ 
+ var currentDateInfo = new Date();
+ var currentYear = currentDateInfo.getFullYear();
+ var currentMonth = currentDateInfo.getMonth()+1;
+ var currentDate = currentDateInfo.getDate();
+ var currentWeekDay = currentDateInfo.getDay();
+ let today = `${currentMonth}/${currentDate}`;
+ console.log(currentDate)
+ let controlSheetData = new GetSheetInfo('Controls','A2:D');
+ let controlSheetValues = controlSheetData.sheetValues;
+ let controlStatus = controlSheetData.sheetValues[0][1];
+ 
+ if(controlStatus !=="ACTIVATED"){
+     return
+   }
+  if(currentWeekDay == 6 || currentWeekDay ==0 ){
+   return
+ }
+ 
+ var thisSpreadSheet = new GetSheetInfo('Form Responses 1','A2:E');
+ let thisTab = thisSpreadSheet.sheetValues;
+ 
+ let existingValues = [];
+ 
+ for(let i = 0; i<thisTab.length;i++){
+   if(thisTab[i][0]===""){
+     console.log(thisTab[i][0])
+     console.log("line 81")
+         continue;
+     }
+ 
+   var submittedTime = Utilities.formatDate(thisTab[i][0], "Asia/Seoul","MM/dd/YYYY");
+   console.log(submittedTime)
+ // parsing submission date information
+   let submitMonth = parseInt(submittedTime.split("/")[0]);
+   let submitDate = parseInt(submittedTime.split("/")[1]);
+   let submitYear = parseInt(submittedTime.split("/")[2]);
+   // check for current day's data
+     // here push emails of current date into allResponseEmails.
+   if(submitMonth == currentMonth && submitDate == currentDate && submitYear == currentYear){
+     if(thisTab[i][0]!=="" || thisTab[i][1]!==""){
+       existingValues.push(thisTab[i]);
+       }
+     }
+ 
+   }
+ // console.log(existingValues);
+ let createNewSheet = thisSpreadSheet.responseSheet.insertSheet(today);
+ 
+ for(let i = 0;i<existingValues.length;i++){
+     createNewSheet.appendRow(existingValues[i])
+ }
+}
+ 
+//----------------------------------------------------------------------------------//
+//----------------------------find missing emails ----------------------------------//
+//----------------------------------------------------------------------------------//
+ 
+function findMissingAndRemind(){
+ 
+ let currentTimeInfo = new getDateInfo();
+ let currentHour = currentTimeInfo.currentUTCHour;
+ let currentMonth = currentTimeInfo.currentMonth +1;
+ let currentDate = currentTimeInfo.currentUTCdate;
+ let currentYear = currentTimeInfo.currentYear;
+ let currentWeekDay = currentTimeInfo.currentWeekDay;
+ let formattedDate = currentTimeInfo.getDateMDY();
+ 
+ //-------------------------Check Weekend ------------------------//
+ if(currentWeekDay == 6 || currentWeekDay ==0 ){
+   return
+ }
+ 
+ let controlSheetData = new GetSheetInfo('Controls','A2:D');
+ let controlSheetValues = controlSheetData.sheetValues;
+ let controlStatus = controlSheetData.sheetValues[0][1];
+ let formUrl = controlSheetData.formUrl;
+ console.log(controlStatus);
+ console.log(currentDate+"-" + currentMonth +"-"+ currentYear)
+ 
+ if(controlStatus !=="ACTIVATED"){
+     return
+   }
+ // get all emails from "controls"
+//-----------------------------------------------------------------//
+ let allEmails = [];
+ for(let i = 0; i < controlSheetValues.length;i++){
+   if(controlSheetValues[i][3]!==""){
+     allEmails.push(controlSheetValues[i][3]);
+   }
+ }
+ // console.log(allEmails)
+ console.log('get all emails line 144')
+// get all responses
+//-----------------------------------------------------------------//
+ let responseSheetData = new GetSheetInfo('Form Responses 1', 'A2:D');
+ let responseSheetDataValues = responseSheetData.sheetValues;
+ let sheetUrl = responseSheetData.sheetUrl;
+ 
+ let todayResponseEmail = [];
+ // loop through all responses
+ for(let i = 0; i <responseSheetDataValues.length;i++){
+   if(responseSheetDataValues[i][0]==""){
+     continue;
+  }
+ console.log("line 157")
+ // formatting submission date
+   var submittedTime = Utilities.formatDate(responseSheetDataValues[i][0],  "Asia/Seoul","MM/dd/YYYY");
+ 
+ // parsing submission date information
+   let submitMonth = parseInt(submittedTime.split("/")[0]);
+   let submitDate = parseInt(submittedTime.split("/")[1]);
+   let submitYear = parseInt(submittedTime.split("/")[2]);
+   console.log(submitDate+"-" + submitMonth +"-"+ submitYear)
+ 
+ // here push emails of current date into allResponseEmails.
+ 
+   if(submitMonth == currentMonth && submitDate == currentDate && submitYear == currentYear){
+     todayResponseEmail.push(responseSheetDataValues[i][1]);
+     }
+ }
+  console.log(todayResponseEmail)
+ // find out missing emails and add to array
+ //-----------------------------------------------------------------//
+ let missingEmails = allEmails.filter((email)=>{
+   return !todayResponseEmail.includes(email);
+ })
+ // console.log(missingEmails)
+ // check if there are missings today, if yes, proceed
+ //-----------------------------------------------------------------//
+ if(missingEmails.length <=0){
+   console.log("All Submitted");
+   let feedBackSubject = 'Survey Status - '+formattedDate;
+   let message = `There are ${missingEmails.length} staff members have not submitted tSurvey.<br> ${sheetUrl}`
+   let emailObject = {to:'email@email.com',subject:feedBackSubject,htmlBody:message}
+   MailApp.sendEmail(emailObject);
+//----------------------send status update email here--------------------------//
+   return
+ }
+ 
+ 
+ if(currentHour > 8 && currentHour < 17 ){
+   let subject = " Please complete Survey";
+   let message = "Please click <a href='"+formUrl+"'> survey</a>.<br/><br/> Thank you. ";
+ 
+   for(let i = 0; i < missingEmails.length;i++){
+     let emailObject = {to:missingEmails[i],subject:subject,htmlBody:message};
+     MailApp.sendEmail(emailObject);
+     // -------------- send reminder emails One by One  ------------ //
+   }
+   let formattedMissingList = missingEmails.map((email)=>{
+     return "<br>"+ email
+   })
+ 
+   let feedbackEmailSubject= "Survey Status - " + formattedDate;
+   let feedbackMessage = `There are ${missingEmails.length} members have not submittedSurvey.<br> ${formattedMissingList} <br><br>Reminder email(s) has been sent.<br><br> Please check your 'Sent' box to confirm that reminder emails are sent.<br><br> Click ${sheetUrl} to see survey results`;
+ 
+   let feedbackObject = {to:"email@email.com",subject:feedbackEmailSubject,htmlBody:feedbackMessage}
+//----------------------send status update email here--------------------------//
+   MailApp.sendEmail(feedbackObject);
+ }
+}
+ 
+//----------------------------------------------------------------------------------//
+//------------------------------get sheet class-------------------------------------//
+//----------------------------------------------------------------------------------//
+ 
+class GetSheetInfo{
+ constructor(tabName,range){
+   this.thisForm = FormApp.getActiveForm();
+   this.formUrl = this.thisForm.getPublishedUrl();
+   this._destinationId = this.thisForm.getDestinationId();
+   this.responseSheet = SpreadsheetApp.openById(this._destinationId );
+   this.sheetTimeZone = this.responseSheet.getSpreadsheetTimeZone();
+   this.getTab = this.responseSheet.getSheetByName(tabName);
+   this.getTabRange = this.getTab.getRange(range);
+   this.sheetValues = this.getTabRange.getValues();
+   this.sheetUrl = this.responseSheet.getUrl();
+ }
+}
+//----------------------------------------------------------------------------------//
+//----------------------------------get date info class-----------------------------//
+//----------------------------------------------------------------------------------//
+ 
+class getDateInfo{
+ constructor(){
+   this.today = new Date();
+   this.monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun","Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
+   this.currentYear = this.today.getFullYear()
+   this.currentMonth = this.today.getMonth();
+   this.currentDate = this.today.getDate();
+   this.currentUTCdate = this.today.getUTCDate();
+   this.currentUTCHour = this.today.getHours();
+   this.currentWeekDay = this.today.getDay();
+ }
+ 
+ getDateMDY(){
+   let monthName = this.monthNames[this.currentMonth];
+   return monthName +" "+ this.currentDate +", "+ this.currentYear
+ }
+ 
+ checkExactDate(month,date){
+   if(this.currentMonth+1 == month &&this.currentDate == date){
+     return true
+   }
+ }
+ 
+ checkIfDatePast(month,date){
+   return ((this.currentMonth+1 == month && this.currentDate > date)||(this.currentMonth+1> month))
+ }
+ 
+ isWeekend(){
+   return (currentWeekDay == 6 || currentWeekDay == 0 )
+ }
+}
+ 
+ 
+ 
+
+function onOpen(){
+ FormApp.getUi().createMenu('Manual Delivery').addItem("Click here to send this form","sendForm")
+ .addToUi();
+}
+//----------------------------------------------------------------------------------//
+//-----------------------------------send forms ------------------------------------//
+//----------------------------------------------------------------------------------//
+ 
+function sendForm() {
+ // date information
+ let today = new Date();
+ let currentWeekDay = today.getDay();
+ let currentDate = today.getUTCDate();
+ let currentMonth = today.getMonth() +1;
+ 
+ let thisForm = new GetSheetInfo('Controls','A2:B5');
+ let thisSheetValues = thisForm.sheetValues;
+ 
+ let controlStatus = thisSheetValues[0][1];
+ let emailAddress = thisSheetValues[2][1];
+ let formUrl = thisForm.formUrl;
+ 
+ let testingEmailAddress = 'aclark@dwight.or.kr,bkilgallon@dwight.or.kr,wlee@dwight.or.kr,dburke@dwight.or.kr,pnoonan@dwight.or.kr';
+ let testingEmailAddress2 = 'tmitchell@dwight.or.kr,cforbes@dwight.or.kr,wlee@dwight.or.kr'
+ 
+ let seoulTimeZone = today.getUTCHours()+9;
+ 
+ console.log(seoulTimeZone);
+ console.log(emailAddress)
+ 
+ if(currentWeekDay == 6 || currentWeekDay ==0 ){
+   return
+ }
+ 
+ if(controlStatus =="ACTIVATED"){
+   let subject = "[Staff] Dwight Daily Health Survey Due by 9a.m.";
+   let message = "Dear Staff,<br/><br/> Dwight Staff Daily Health Survey is due by 9:00am every day.<br/><br/> Please click <a href='"+formUrl+"'> today's health survey</a>.<br/><br/> Thank you. <br/><br/> Dwight School Seoul HR<br/><br/>";
+ 
+   let emailObject = {to:testingEmailAddress2,subject:subject,htmlBody:message};
+   if(emailAddress){
+     console.log("sending email")
+     MailApp.sendEmail(emailObject);
+     console.log("Email sent ")
+   }
+ }
+}
+ 
+//----------------------------------------------------------------------------------//
+//-------------------------------create new tabs-----------------------------------//
+//----------------------------------------------------------------------------------//
+ 
+function createNewTab(){
+ 
+ var currentDateInfo = new Date();
+ var currentYear = currentDateInfo.getFullYear();
+ var currentMonth = currentDateInfo.getMonth()+1;
+ var currentDate = currentDateInfo.getDate();
+ var currentWeekDay = currentDateInfo.getDay();
+ let today = `${currentMonth}/${currentDate}`;
+ console.log(currentDate)
+ let controlSheetData = new GetSheetInfo('Controls','A2:D');
+ let controlSheetValues = controlSheetData.sheetValues;
+ let controlStatus = controlSheetData.sheetValues[0][1];
+ 
+ if(controlStatus !=="ACTIVATED"){
+     return
+   }
+  if(currentWeekDay == 6 || currentWeekDay ==0 ){
+   return
+ }
+ 
+ var thisSpreadSheet = new GetSheetInfo('Form Responses 1','A2:E');
+ let thisTab = thisSpreadSheet.sheetValues;
+ 
+ let existingValues = [];
+ 
+ for(let i = 0; i<thisTab.length;i++){
+   if(thisTab[i][0]===""){
+     console.log(thisTab[i][0])
+     console.log("line 81")
+         continue;
+     }
+ 
+   var submittedTime = Utilities.formatDate(thisTab[i][0], "Asia/Seoul","MM/dd/YYYY");
+   console.log(submittedTime)
+ // parsing submission date information
+   let submitMonth = parseInt(submittedTime.split("/")[0]);
+   let submitDate = parseInt(submittedTime.split("/")[1]);
+   let submitYear = parseInt(submittedTime.split("/")[2]);
+   // check for current day's data
+     // here push emails of current date into allResponseEmails.
+   if(submitMonth == currentMonth && submitDate == currentDate && submitYear == currentYear){
+     if(thisTab[i][0]!=="" || thisTab[i][1]!==""){
+       existingValues.push(thisTab[i]);
+       }
+     }
+   }
+ // console.log(existingValues);
+ let createNewSheet = thisSpreadSheet.responseSheet.insertSheet(today);
+ 
+ for(let i = 0;i<existingValues.length;i++){
+     createNewSheet.appendRow(existingValues[i])
+ }
+}
+ 
+//----------------------------------------------------------------------------------//
+//----------------------------find missing emails ----------------------------------//
+//----------------------------------------------------------------------------------//
+ 
+ 
+function findMissingAndRemind(){
+ 
+ let currentTimeInfo = new getDateInfo();
+ let currentHour = currentTimeInfo.currentUTCHour;
+ let currentMonth = currentTimeInfo.currentMonth +1;
+ let currentDate = currentTimeInfo.currentUTCdate;
+ let currentYear = currentTimeInfo.currentYear;
+ let currentWeekDay = currentTimeInfo.currentWeekDay;
+ let formattedDate = currentTimeInfo.getDateMDY();
+ 
+ //-------------------------Check Weekend ------------------------//
+ if(currentWeekDay == 6 || currentWeekDay ==0 ){
+   return
+ }
+ 
+ let controlSheetData = new GetSheetInfo('Controls','A2:D');
+ let controlSheetValues = controlSheetData.sheetValues;
+ let controlStatus = controlSheetData.sheetValues[0][1];
+ let formUrl = controlSheetData.formUrl;
+ 
+ console.log(controlStatus);
+ // console.log(currentDate+"-" + currentMonth +"-"+ currentYear)
+ 
+ if(controlStatus !=="ACTIVATED"){
+     return
+   }
+ // get all emails from "controls"
+//-----------------------------------------------------------------//
+ let allEmails = [];
+ for(let i = 0; i < controlSheetValues.length;i++){
+   if(controlSheetValues[i][3]!==""){
+     let individualObject = {
+       'name':controlSheetValues[i][2],
+       'email':controlSheetValues[i][3]
+     }
+     allEmails.push(individualObject);
+   }
+ }
+ // console.log(allEmails)
+ console.log('get all emails line 260')
+// get all responses
+//-----------------------------------------------------------------//
+ let responseSheetData = new GetSheetInfo('Form Responses 1', 'A2:D');
+ let responseSheetDataValues = responseSheetData.sheetValues;
+ let sheetUrl = responseSheetData.sheetUrl;
+ 
+ let todayResponseEmail = [];
+ // loop through all responses
+ for(let i = 0; i <responseSheetDataValues.length;i++){
+   if(responseSheetDataValues[i][0]==""){
+     continue;
+  }
+ 
+ console.log("line 157")
+ // formatting submission date
+   var submittedTime = Utilities.formatDate(responseSheetDataValues[i][0],  "Asia/Seoul","MM/dd/YYYY");
+ // parsing submission date information
+   let submitMonth = parseInt(submittedTime.split("/")[0]);
+   let submitDate = parseInt(submittedTime.split("/")[1]);
+   let submitYear = parseInt(submittedTime.split("/")[2]);
+   // console.log(submitDate+"-" + submitMonth +"-"+ submitYear)
+ 
+ // here push emails of current date into allResponseEmails.
+ 
+   if(submitMonth == currentMonth && submitDate == currentDate && submitYear == currentYear){
+     let todayResponsesObject = {
+       'name':responseSheetDataValues[i][2],
+       'email':responseSheetDataValues[i][1],
+       'answer':responseSheetDataValues[i][3]
+     }
+     todayResponseEmail.push(todayResponsesObject);
+     }
+ }
+ //  console.log(todayResponseEmail)
+ // find out missing emails and add to array
+ //-----------------------------------------------------------------//
+ let missingEmails = allEmails.filter((individual)=>{
+   return !todayResponseEmail.some((response)=>{
+     return individual.email == response.email;
+   })
+ })
+ console.log('Found missing:');
+ console.log(missingEmails)
+ 
+ 
+ //--------------------when NO Missing, all submitted-------------------------//
+ if(missingEmails.length <=0){
+   console.log("All Submitted");
+   let feedBackSubject = 'Survey Status - '+formattedDate;
+   let message = `There are ${missingEmails.length} staff members have not submitted today's Health Survey.<br> ${sheetUrl}`
+   let emailObject = {to:'lchi@dwight.or.kr',subject:feedBackSubject,htmlBody:message}
+   MailApp.sendEmail(emailObject);
+//----------------------send status update email here--------------------------//
+   return
+ }
+ 
+//----------------------------------------------------------------------------------//
+ if(currentHour > 8 && currentHour < 17 ){
+   let subject = "[Staff] Please complete Dwight Daily Health Survey";
+ 
+   for(let i = 0; i < missingEmails.length;i++){
+     let message = "Dear "+missingEmails[i]['name'].split(" ")[0]+",<br/><br/> Dwight Staff Daily Health Survey is due by 9:00am every day.<br/><br/> Please click <a href='"+formUrl+"'> today's health survey</a>.<br/><br/> Thank you. <br/><br/> Dwight School Seoul HR<br/><br/>";
+ 
+     let emailObject = {to:missingEmails[i]['email'],subject:subject,htmlBody:message};
+// ------------------------ send reminder emails One by One  ---------------------- //
+    MailApp.sendEmail(emailObject);
+     console.log(message)
+   }
+ 
+//----------------------------- Feedback Email to Shawn --------------------------------//
+ 
+   let formattedMissingList = missingEmails.map((email)=>{
+     return "<br>"+ email['name'] +" - "+ email['email'];
+   })
+//----------------------------- Preparing EMail here--------------------------------//
+ 
+   let feedbackEmailSubject= "Survey Status - " + formattedDate;
+   let feedbackMessage = `There are ${missingEmails.length} staff members have not submitted today's Health Survey.<br> ${formattedMissingList} <br><br>Reminder email(s) has been sent.<br><br> Please check your 'Sent' box to confirm that reminder emails are sent.<br><br> Click ${sheetUrl} to see survey results`;
+ 
+//----------------------------- Set up EMail Object --------------------------------//
+ 
+   let feedbackObject = {to:"lchi@dwight.or.kr",subject:feedbackEmailSubject,htmlBody:feedbackMessage}
+//----------------------send status update email here--------------------------//
+   MailApp.sendEmail(feedbackObject);
+ }
+}
+ 
+//----------------------------------------------------------------------------------//
+//------------------------------get sheet class-------------------------------------//
+//----------------------------------------------------------------------------------//
+ 
+class GetSheetInfo{
+ constructor(tabName,range){
+   this.thisForm = FormApp.getActiveForm();
+   this.formUrl = this.thisForm.getPublishedUrl();
+   this._destinationId = this.thisForm.getDestinationId();
+   this.responseSheet = SpreadsheetApp.openById(this._destinationId );
+   this.sheetTimeZone = this.responseSheet.getSpreadsheetTimeZone();
+   this.getTab = this.responseSheet.getSheetByName(tabName);
+   this.getTabRange = this.getTab.getRange(range);
+   this.sheetValues = this.getTabRange.getValues();
+   this.sheetUrl = this.responseSheet.getUrl();
+ }
+}
+//----------------------------------------------------------------------------------//
+//----------------------------------get date info class-----------------------------//
+//----------------------------------------------------------------------------------//
+ 
+class getDateInfo{
+ constructor(){
+   this.today = new Date();
+   this.monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun","Jul", "Aug", "Sept", "Oct", "Nov", "Dec"];
+   this.currentYear = this.today.getFullYear()
+   this.currentMonth = this.today.getMonth();
+   this.currentDate = this.today.getDate();
+   this.currentUTCdate = this.today.getUTCDate();
+   this.currentUTCHour = this.today.getHours();
+   this.currentWeekDay = this.today.getDay();
+ }
+ 
+ getDateMDY(){
+   let monthName = this.monthNames[this.currentMonth];
+   return monthName +" "+ this.currentDate +", "+ this.currentYear
+ }
+ 
+ checkExactDate(month,date){
+   if(this.currentMonth+1 == month &&this.currentDate == date){
+     return true
+   }
+ }
+ 
+ checkIfDatePast(month,date){
+   return ((this.currentMonth+1 == month && this.currentDate > date)||(this.currentMonth+1> month))
+ }
+ 
+ isWeekend(){
+   return (currentWeekDay == 6 || currentWeekDay == 0 )
+ }
+}
+ 
+ 
